@@ -603,7 +603,15 @@ function renderTeamSchedule() {
         targetPeriods.forEach(p => {
             if (date >= p.startDate && date <= p.endDate) {
                 const pEntries = store.getEntries(p.id);
-                officeCount += pEntries.filter(e => e.date === date && e.status === STATUS_TYPES.OFFICE).length;
+                // Only count entries from approved users
+                pEntries.forEach(e => {
+                    if (e.date === date && e.status === STATUS_TYPES.OFFICE) {
+                        const approvalStatus = store.getApprovalStatus(p.id, e.userId);
+                        if (approvalStatus === 'approved') {
+                            officeCount++;
+                        }
+                    }
+                });
             }
         });
 
@@ -622,8 +630,26 @@ function renderTeamSchedule() {
             <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">${user.name}</td>`;
 
         allDates.forEach(date => {
-            const entry = store.getEntry(user.id, date);
-            const status = entry ? entry.status : '';
+            // Find which period this date belongs to
+            let periodForDate = null;
+            for (const p of targetPeriods) {
+                if (date >= p.startDate && date <= p.endDate) {
+                    periodForDate = p;
+                    break;
+                }
+            }
+
+            // Check approval status for this user and period
+            const approvalStatus = periodForDate ? store.getApprovalStatus(periodForDate.id, user.id) : 'draft';
+
+            // Only show entry if approved
+            let entry = null;
+            let status = '';
+            if (approvalStatus === 'approved') {
+                entry = store.getEntry(user.id, date);
+                status = entry ? entry.status : '';
+            }
+
             const statusClass = status ? `status-${status}` : 'status-Empty';
             const displayStatus = status === 'Off' ? '/' : (status || '-');
 
