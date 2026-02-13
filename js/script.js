@@ -1017,8 +1017,27 @@ function renderAdmin() {
 }
 
 // --- INIT ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     if (window.lucide) lucide.createIcons();
+
+    // Wait for Firebase to initialize
+    await new Promise(resolve => {
+        const checkInit = setInterval(() => {
+            if (store.state.users && store.state.users.length > 0) {
+                clearInterval(checkInit);
+                resolve();
+            }
+        }, 100);
+
+        // Timeout after 10 seconds
+        setTimeout(() => {
+            clearInterval(checkInit);
+            if (!store.state.users || store.state.users.length === 0) {
+                alert('Failed to load data from Firebase. Please refresh the page.');
+            }
+            resolve();
+        }, 10000);
+    });
 
     const currentUser = store.getCurrentUser();
     const loginView = document.getElementById('login-view');
