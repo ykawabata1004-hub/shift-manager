@@ -854,8 +854,23 @@ function renderMyInput(periodId = null) {
     ).join('');
 }
 
-function renderAdmin() {
-    const period = store.getCurrentPeriod();
+let adminSelectedPeriodId = null;
+
+function renderAdmin(periodId = null) {
+    // Use provided periodId, or fall back to adminSelectedPeriodId, or current period
+    if (periodId) {
+        adminSelectedPeriodId = periodId;
+    }
+
+    let period = null;
+    if (adminSelectedPeriodId) {
+        period = store.getPeriods().find(p => p.id === adminSelectedPeriodId);
+    }
+    if (!period) {
+        period = store.getCurrentPeriod();
+        adminSelectedPeriodId = period ? period.id : null;
+    }
+
     const statusSpan = document.getElementById('admin-period-status');
     const lockBtn = document.getElementById('toggle-lock-btn');
     const memberList = document.getElementById('admin-member-list');
@@ -867,15 +882,15 @@ function renderAdmin() {
         lockBtn.textContent = period.isLocked ? 'Unlock Period' : 'Lock Period';
         lockBtn.onclick = () => {
             store.setPeriodLock(period.id, !period.isLocked);
-            renderAdmin();
+            renderAdmin(period.id);
         };
 
-        // --- Active Period Switcher ---
+        // --- Period Viewer ---
         const periodSwitcherContainer = document.querySelector('.period-switcher');
         if (!periodSwitcherContainer) {
             const switcherDiv = document.createElement('div');
             switcherDiv.className = 'period-switcher mb-4 border-b pb-4';
-            switcherDiv.innerHTML = `<label class="block text-sm font-medium mb-2">Switch Active Period</label><div id="period-list" class="space-y-2"></div>`;
+            switcherDiv.innerHTML = `<label class="block text-sm font-medium mb-2">View Period Approvals</label><div id="period-list" class="space-y-2"></div>`;
             statusSpan.closest('.space-y-4').insertBefore(switcherDiv, statusSpan.closest('.flex'));
         }
 
@@ -883,22 +898,22 @@ function renderAdmin() {
         if (periodList) {
             periodList.innerHTML = '';
             store.getPeriods().forEach(p => {
+                const isSelected = p.id === adminSelectedPeriodId;
                 const isActive = p.id === store.state.currentPeriodId;
                 const div = document.createElement('div');
-                div.className = `flex items-center justify-between p-2 rounded border ${isActive ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`;
+                div.className = `flex items-center justify-between p-2 rounded border ${isSelected ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`;
                 div.innerHTML = `
-                    <span class="text-xs ${isActive ? 'font-bold text-blue-700' : 'text-gray-600'}">
+                    <span class="text-xs ${isSelected ? 'font-bold text-blue-700' : 'text-gray-600'}">
                         ${p.startDate} ~ ${p.endDate} ${isActive ? '(Active)' : ''}
                     </span>
-                    ${!isActive ? `<button class="switch-btn text-xs bg-white border border-gray-300 px-2 py-1 rounded hover:bg-gray-50" data-id="${p.id}">Switch</button>` : ''}
+                    ${!isSelected ? `<button class="view-period-btn text-xs bg-white border border-gray-300 px-2 py-1 rounded hover:bg-gray-50" data-id="${p.id}">View</button>` : '<span class="text-xs text-blue-600 font-bold">Viewing</span>'}
                 `;
                 periodList.appendChild(div);
             });
 
-            document.querySelectorAll('.switch-btn').forEach(btn => {
+            document.querySelectorAll('.view-period-btn').forEach(btn => {
                 btn.onclick = (e) => {
-                    store.setActivePeriod(e.target.dataset.id);
-                    window.location.reload();
+                    renderAdmin(e.target.dataset.id);
                 };
             });
         }
@@ -939,7 +954,7 @@ function renderAdmin() {
             const role = document.getElementById('new-user-role').value;
             if (name) {
                 store.addUser(name, type, role);
-                renderAdmin();
+                renderAdmin(adminSelectedPeriodId);
                 document.getElementById('new-user-name').value = '';
             }
         });
@@ -996,21 +1011,21 @@ function renderAdmin() {
         document.querySelectorAll('.approve-btn').forEach(btn => {
             btn.onclick = (e) => {
                 store.updateApprovalStatus(period.id, e.target.dataset.uid, 'approved');
-                renderAdmin();
+                renderAdmin(period.id);
             };
         });
         document.querySelectorAll('.deny-btn').forEach(btn => {
             btn.onclick = (e) => {
                 if (confirm('Deny this schedule? The user will be able to edit and resubmit.')) {
                     store.updateApprovalStatus(period.id, e.target.dataset.uid, 'denied');
-                    renderAdmin();
+                    renderAdmin(period.id);
                 }
             };
         });
         document.querySelectorAll('.revert-btn').forEach(btn => {
             btn.onclick = (e) => {
                 store.updateApprovalStatus(period.id, e.target.dataset.uid, 'draft');
-                renderAdmin();
+                renderAdmin(period.id);
             };
         });
     }
