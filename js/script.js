@@ -170,7 +170,7 @@ const UK_BANK_HOLIDAYS = [
 ];
 
 // --- STORE ---
-const STORAGE_KEY = 'shift_manager_current_user'; // Only store current user locally
+const STORAGE_KEY = 'shift_manager_current_user'; // Session-based storage (clears on browser close)
 
 class Store {
     constructor() {
@@ -186,15 +186,8 @@ class Store {
             memos: {}
         };
 
-        // Load current user from localStorage (local only)
-        const storedUser = localStorage.getItem(STORAGE_KEY);
-        if (storedUser) {
-            try {
-                this.state.currentUser = JSON.parse(storedUser);
-            } catch (e) {
-                console.error('Failed to load current user', e);
-            }
-        }
+        // DO NOT auto-load user - always show login screen
+        // Session will be maintained during browser session only
 
         // Initialize Firebase data
         this.initializeFirebase();
@@ -353,13 +346,13 @@ class Store {
     setCurrentUser(userId) {
         if (!userId) {
             this.state.currentUser = null;
-            localStorage.removeItem(STORAGE_KEY);
+            sessionStorage.removeItem(STORAGE_KEY);
         } else {
             const user = this.state.users.find(u => u.id === userId);
             if (user) {
                 this.state.currentUser = user;
-                // Save current user to localStorage (local only)
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+                // Save current user to sessionStorage (session only)
+                sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
             }
         }
     }
@@ -521,8 +514,8 @@ class Store {
             currentPeriodId: SEED_DATA.currentPeriodId,
             memos: SEED_DATA.memos || {}
         });
-        // Clear local user data
-        localStorage.removeItem(STORAGE_KEY);
+        // Clear session user data
+        sessionStorage.removeItem(STORAGE_KEY);
         window.location.reload();
     }
 }
@@ -1113,44 +1106,66 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 10000);
     });
 
-    const currentUser = store.getCurrentUser();
+    // ALWAYS show login screen - no auto-login
+    console.log('App init. Always showing login screen.');
+
     const loginView = document.getElementById('login-view');
     const dashboardView = document.getElementById('dashboard-view');
 
-    console.log('App init. Current user:', currentUser);
+    // Ensure login view is visible
+    loginView.classList.remove('hidden');
+    dashboardView.classList.add('hidden');
 
-    if (!currentUser) {
-        renderLogin();
-    } else {
-        loginView.classList.add('hidden');
-        dashboardView.classList.remove('hidden');
-        dashboardView.classList.add('flex');
+    // Render login screen with user list
+    const userList = document.getElementById('user-list');
+    userList.innerHTML = '';
+    const users = store.getUsers();
+    users.forEach(user => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full bg-white hover:bg-blue-50 text-gray-900 font-medium py-3 px-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-colors';
+        btn.textContent = user.name;
+        btn.onclick = () => {
+            // Check if Kawabata - require password
+            if (user.role === 'manager') {
+                const password = prompt(`Enter password for ${user.name}:`);
+                if (password !== 'admin') {
+                    alert('Incorrect password');
+                    return;
+                }
+            }
 
-        updateHeader(currentUser);
+            // Set current user and show dashboard
+            store.setCurrentUser(user.id);
+            loginView.classList.add('hidden');
+            dashboardView.classList.remove('hidden');
+            dashboardView.classList.add('flex');
 
-        store.ensureFuturePeriods();
+            updateHeader(user);
+            store.ensureFuturePeriods();
 
-        // SMART INIT: Ensure we are looking at the period containing Today
-        const currentPeriod = store.getCurrentPeriod();
-        const today = new Date().toISOString().split('T')[0];
-        const periods = store.getPeriods();
-        const todayPeriod = periods.find(p => today >= p.startDate && today <= p.endDate);
+            // SMART INIT: Ensure we are looking at the period containing Today
+            const currentPeriod = store.getCurrentPeriod();
+            const today = new Date().toISOString().split('T')[0];
+            const periods = store.getPeriods();
+            const todayPeriod = periods.find(p => today >= p.startDate && today <= p.endDate);
 
-        if (todayPeriod && currentPeriod.id !== todayPeriod.id) {
-            console.log('Auto-switching to Today period:', todayPeriod.id);
-            store.setActivePeriod(todayPeriod.id);
-        } else if (!currentPeriod) {
-            // Fallback creation logic
-            const todayDate = new Date();
-            const day = todayDate.getDay();
-            const diff = todayDate.getDate() - day + (day == 0 ? -6 : 1);
-            const lastMonday = new Date(todayDate.setDate(diff));
-            const { start, end } = getBiWeeklyRange(lastMonday.toISOString());
-            store.createPeriod(start, end);
-        }
+            if (todayPeriod && currentPeriod.id !== todayPeriod.id) {
+                console.log('Auto-switching to Today period:', todayPeriod.id);
+                store.setActivePeriod(todayPeriod.id);
+            } else if (!currentPeriod) {
+                // Fallback creation logic
+                const todayDate = new Date();
+                const day = todayDate.getDay();
+                const diff = todayDate.getDate() - day + (day == 0 ? -6 : 1);
+                const lastMonday = new Date(todayDate.setDate(diff));
+                const { start, end } = getBiWeeklyRange(lastMonday.toISOString());
+                store.createPeriod(start, end);
+            }
 
-        renderTeamSchedule();
-    }
+            renderTeamSchedule();
+        };
+        userList.appendChild(btn);
+    });
 
     document.querySelectorAll('.nav-tab').forEach(btn => {
         btn.addEventListener('click', (e) => {
