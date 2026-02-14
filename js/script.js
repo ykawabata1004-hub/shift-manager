@@ -596,7 +596,7 @@ function renderTeamSchedule() {
     allDates.forEach(date => {
         const d = new Date(date);
         const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6 || UK_BANK_HOLIDAYS.includes(date);
         const headerClass = isWeekend ? 'text-red-500 bg-red-50' : 'text-gray-700';
 
         let officeCount = 0;
