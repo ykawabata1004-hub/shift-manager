@@ -1128,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Check if Kawabata - require password
             if (user.role === 'manager') {
                 const password = prompt(`Enter password for ${user.name}:`);
-                if (password !== 'admin') {
+                if (password !== 'kawabata') {
                     alert('Incorrect password');
                     return;
                 }
